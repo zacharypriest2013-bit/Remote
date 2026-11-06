@@ -1,0 +1,46 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Phone Remote</title>
+<style>
+body{margin:0;background:#111;color:#eee;font-family:sans-serif;text-align:center}
+canvas{max-height:86vh;max-width:100%;touch-action:none;cursor:pointer;background:#000}
+button{margin:6px;padding:10px 18px;font-size:16px}
+#s{font-size:13px;color:#999}
+</style></head>
+<body>
+<div>
+  <button data-k="back">&#9664; Back</button>
+  <button data-k="home">&#9679; Home</button>
+  <button data-k="recents">&#9632; Recents</button>
+</div>
+<canvas id="c" width="360" height="640"></canvas>
+<div id="s">Waiting for frames... (check the password and that sharing is started)</div>
+<script>
+let pin = sessionStorage.pin || prompt('Password shown on the phone:');
+sessionStorage.pin = pin;
+const c = document.getElementById('c'), x = c.getContext('2d'), s = document.getElementById('s');
+function api(p){ return fetch(p + (p.includes('?') ? '&' : '?') + 'pin=' + pin).then(r => r.text()).then(t => { if (t !== 'ok') s.textContent = t; }); }
+function loop(){
+  const i = new Image();
+  i.onload = () => {
+    if (c.width !== i.width) { c.width = i.width; c.height = i.height; }
+    x.drawImage(i, 0, 0); s.textContent = ''; setTimeout(loop, 60);
+  };
+  i.onerror = () => setTimeout(loop, 800);
+  i.src = '/frame.jpg?pin=' + pin + '&t=' + Date.now();
+}
+loop();
+let d = null;
+function pos(e){ const r = c.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height]; }
+c.onpointerdown = e => { d = {p: pos(e), t: Date.now()}; };
+c.onpointerup = e => {
+  if (!d) return;
+  const [a, b] = d.p, [u, v] = pos(e), ms = Math.max(Date.now() - d.t, 50);
+  d = null;
+  if (Math.hypot(u - a, v - b) < 0.02) api(`/tap?x=${a}&y=${b}`);
+  else api(`/swipe?x1=${a}&y1=${b}&x2=${u}&y2=${v}&ms=${Math.min(ms, 2000)}`);
+};
+document.querySelectorAll('button').forEach(b => b.onclick = () => api('/key?k=' + b.dataset.k));
+</script>
+</body></html>
